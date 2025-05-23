@@ -1,6 +1,9 @@
+from flask import Flask, request, jsonify
 from duckduckgo_search import DDGS
 import requests
 from bs4 import BeautifulSoup
+
+app = Flask(__name__)
 
 def search_duckduckgo(query, max_results=5):
     with DDGS() as ddgs:
@@ -30,27 +33,35 @@ def get_meaningful_paragraph(url, min_len=60, max_total=800):
                 break
 
         return summary.strip()
-    except Exception as e:
+    except Exception:
         return None
 
 def get_best_summary(query):
     urls = search_duckduckgo(query)
     for url in urls:
-        print(f"🔗 Trying: {url}")
         summary = get_meaningful_paragraph(url)
         if summary:
-            return f"📖 From: {url}\n\n{summary}"
-    return f"❌ No good content found for: {query}"
+            return {
+                "query": query,
+                "source": url,
+                "summary": summary
+            }
+    return {
+        "query": query,
+        "error": "No good content found"
+    }
 
-# 🔬 Search Queries
-queries = [
-    "dog fungal infections",
-    "dog hypersensitivity allergic dermatosis",
-    "dog bacterial dermatosis",
-    "healthy dog skin"
-]
+@app.route('/')
+def home():
+    return "👋 Welcome to the Dog Health Info API. Use /search?query=your_disease"
 
-for query in queries:
-    print(f"\n🔍 Searching: {query}")
-    print(get_best_summary(query))
-    print("=" * 140)
+@app.route('/search', methods=['GET'])
+def search():
+    query = request.args.get("query")
+    if not query:
+        return jsonify({"error": "Query parameter is required"}), 400
+    result = get_best_summary(query)
+    return jsonify(result)
+
+if __name__ == '__main__':
+    app.run(debug=True)
